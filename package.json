@@ -6,9 +6,11 @@
   "scripts": {
     "crawl": "tsx scripts/crawl.ts",
     "normalize": "tsx scripts/normalize.ts",
+    "enrich": "tsx --env-file=.env scripts/enrich.ts",
     "test": "vitest run"
   },
   "dependencies": {
+    "@google/genai": "^2.17.0",
     "cheerio": "^1.0.0"
   },
   "devDependencies": {

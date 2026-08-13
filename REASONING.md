@@ -29,7 +29,22 @@ Revisit if/when scaling past this fixture (e.g. cross-check against listing
 title keywords that could be related to rental like "wynajmę"/"najem", or classify with AI if the heuristic starts producing false positives).
 
 ## 3. Where and why you used AI
-TODO
+
+AI is used in exactly one place in the pipeline: `scripts/enrich.ts` /
+`lib/ai/summarize.ts`, which generates a short buyer-facing summary
+(`AI_resume`) for each listing from its already-normalized structured fields
+(location, price, area, rooms, floor/elevator, amenities, etc. — see §1/§2).
+It is deliberately **not** used for field extraction itself; that stays 100%
+deterministic HTML parsing (`lib/normalize/*`), so the data buyers filter and
+sort on is auditable and free of hallucination risk. AI's job is purely
+presentational: turning a fact sheet into 2-3 readable sentences, with an
+explicit system-prompt instruction to use only the given facts and never
+invent details.
+
+**Provider:** Google Gemini (`gemini-3.6-flash` via the `@google/genai`
+SDK's Interactions API).
+
+**Known limitation — free-tier quota:** TODO
 
 ## 4. One key assumption you made
 TODO
