@@ -12,6 +12,9 @@
     "db:seed": "tsx --env-file=.env scripts/seed.ts",
     "db:studio": "node --env-file=.env node_modules/prisma/build/index.js studio",
     "dev:api": "tsx --env-file=.env app/api/index.ts",
+    "dev:docker": "docker compose up -d",
+    "dev:front": "npm run dev --prefix app/front-end",
+    "dev": "npm run dev:docker && concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:front\"",
     "test": "vitest run"
   },
   "dependencies": {
@@ -24,6 +27,7 @@
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.0",
+    "concurrently": "^8.2.2",
     "prisma": "^7.9.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
