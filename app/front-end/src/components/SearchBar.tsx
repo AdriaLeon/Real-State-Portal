@@ -2,13 +2,18 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import styles from "./styles/SearchBar.module.css";
 
-// Visual only for now — no request is fired on submit yet.
-export default function SearchBar() {
+export interface SearchBarProps {
+  onSearch: (query: string) => void;
+}
+
+export default function SearchBar({ onSearch }: SearchBarProps) {
   const [query, setQuery] = useState("");
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    // TODO: wire to GET /search once free-text search is added to the home page.
+    const trimmed = query.trim();
+    if (!trimmed) return; // GET /search requires a non-blank q — don't fire an invalid request
+    onSearch(trimmed);
   }
 
   return (

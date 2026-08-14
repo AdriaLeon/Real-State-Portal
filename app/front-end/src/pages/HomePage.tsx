@@ -18,12 +18,18 @@ export default function HomePage() {
     navigate(`/listings?${params.toString()}`);
   }
 
+  // Same destination as FilterPanel's Apply — ListingsPage sees the `q`
+  // param and calls GET /search instead of GET /listings.
+  function handleSearch(query: string) {
+    navigate(`/listings?${new URLSearchParams({ q: query }).toString()}`);
+  }
+
   return (
     <main className={styles.page}>
       <header className={styles.hero}>
         <h1 className={styles.title}>Find your next home</h1>
         <div className={styles.searchRow}>
-          <SearchBar />
+          <SearchBar onSearch={handleSearch} />
           <FilterPanel onApply={handleApplyFilters} />
         </div>
       </header>

@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getListings } from "../api/listings";
+import { search } from "../api/search";
 import { ApiError } from "../api/client";
 import type { ListingFilters } from "../types/filters";
 import type { ListingSummaryDto } from "../types/listing";
 import type { PaginationMeta } from "../types/pagination";
+import type { DetectedFilters } from "../types/search";
 import ListingCard from "../components/ListingCard";
 import styles from "./styles/ListingsPage.module.css";
 
 type LoadState =
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "success"; listings: ListingSummaryDto[]; pagination: PaginationMeta };
+  | {
+      status: "success";
+      listings: ListingSummaryDto[];
+      pagination: PaginationMeta;
+      detected: DetectedFilters | null;
+    };
 
 // Reads the filters HomePage's FilterPanel encoded into the query string
 // back out into a typed ListingFilters — keeps the URL as the single source
@@ -74,20 +81,57 @@ function describeFilters(filters: ListingFilters): string[] {
   return chips;
 }
 
+// Same idea, but for what GET /search detected out of the free-text query
+// — every one of these fields actually constrained the results (see
+// api/search.ts), so this is a true description of what's filtering.
+function describeDetectedFilters(detected: DetectedFilters): string[] {
+  const chips: string[] = [];
+  if (detected.city) chips.push(`City: ${detected.city}`);
+  if (detected.district) chips.push(`District: ${detected.district}`);
+  if (detected.priceBand === "cheap") chips.push("Cheap");
+  if (detected.priceBand === "expensive") chips.push("Expensive");
+  if (detected.areaBand === "small") chips.push("Small");
+  if (detected.areaBand === "big") chips.push("Big");
+  if (detected.marketType) chips.push(detected.marketType === "primary" ? "Primary market" : "Secondary market");
+  if (detected.sellerType) chips.push(detected.sellerType === "agency" ? "Agency" : "Private seller");
+  if (detected.hasElevator) chips.push("Has elevator");
+  for (const amenity of detected.amenities) chips.push(`Amenity: ${amenity}`);
+  return chips;
+}
+
 export default function ListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
+  // `q` (from SearchBar) and structured filters (from FilterPanel) are
+  // mutually exclusive request modes — the backend's GET /search ignores
+  // filter params entirely, so whichever produced this URL wins outright.
+  const q = searchParams.get("q");
   const filters = parseFiltersFromSearchParams(searchParams);
-  const chips = describeFilters(filters);
+
+  const chips = q
+    ? [`Search: "${q}"`, ...(state.status === "success" && state.detected ? describeDetectedFilters(state.detected) : [])]
+    : describeFilters(filters);
 
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
 
-    getListings(filters)
-      .then((res) => {
-        if (!cancelled) setState({ status: "success", listings: res.data, pagination: res.pagination });
+    const request = q
+      ? search(q, { page: filters.page }).then((res) => ({
+          listings: res.data,
+          pagination: res.pagination,
+          detected: res.detected,
+        }))
+      : getListings(filters).then((res) => ({
+          listings: res.data,
+          pagination: res.pagination,
+          detected: null,
+        }));
+
+    request
+      .then((result) => {
+        if (!cancelled) setState({ status: "success", ...result });
       })
       .catch((err) => {
         if (cancelled) return;
