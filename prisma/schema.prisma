@@ -1,10 +1,69 @@
-// TODO: add RawListing and Listing models (see dev plan, step 2 — schema)
+// Schema for the Smart Real Estate Listings Platform.
+//
+// Connection config (datasource url, shadow db) lives in prisma.config.ts,
+// not here.
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
+}
+
+model Listing {
+  sourceId String @id // sprzedajemy.pl's own numeric listing id, e.g. "73695494"
+  source   String @default("sprzedajemy")
+  url      String @db.Text // long slug-based URLs. Text avoids the ~191-char default VARCHAR cap
+
+  title       String @db.VarChar(500) // some source titles pack address + specs into one line
+  description String @db.Text
+
+  city     String  @db.VarChar(100)
+  district String? @db.VarChar(100)
+
+  price        Int // PLN, total. Always-integer in the data, no sub-unit (grosz) precision needed
+  pricePerM2   Int
+  isNegotiable Boolean
+
+  area  Float // m²
+  rooms Int
+
+  floor       Int // 0 = ground floor
+  totalFloors Int?
+  yearBuilt   Int?
+
+  marketType    MarketType
+  buildingType  String?    @db.VarChar(50) // open vocabulary (blok, apartamentowiec, kamienica, ...) — not a fixed enum
+  ownershipForm String?    @db.VarChar(50)
+  heating       String?    @db.VarChar(50)
+  sellerType    SellerType
+  hasElevator   Boolean
+
+  amenities Json // string[]. MySQL has no native array type
+  images    Json // string[]
+  imageCount Int
+
+  AI_resume   String? @db.Text
+  contentHash String? @db.VarChar(64) // sha256 hex digest is always exactly 64 chars
+
+  fetchedAt    DateTime
+  normalizedAt DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([city, price]) // covers "filter by city" alone (leftmost prefix) and "city + price range" together
+  @@index([rooms])
+  @@index([marketType])
+}
+
+enum MarketType {
+  primary
+  secondary
+}
+
+enum SellerType {
+  private
+  agency
 }

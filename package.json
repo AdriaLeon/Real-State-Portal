@@ -7,14 +7,21 @@
     "crawl": "tsx scripts/crawl.ts",
     "normalize": "tsx scripts/normalize.ts",
     "enrich": "tsx --env-file=.env scripts/enrich.ts",
+    "db:generate": "node --env-file=.env node_modules/prisma/build/index.js generate",
+    "db:migrate": "node --env-file=.env node_modules/prisma/build/index.js migrate dev",
+    "db:seed": "tsx --env-file=.env scripts/seed.ts",
+    "db:studio": "node --env-file=.env node_modules/prisma/build/index.js studio",
     "test": "vitest run"
   },
   "dependencies": {
     "@google/genai": "^2.17.0",
+    "@prisma/adapter-mariadb": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "cheerio": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "prisma": "^7.9.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
