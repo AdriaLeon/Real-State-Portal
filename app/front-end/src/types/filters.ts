@@ -3,10 +3,7 @@ export type SellerType = "private" | "agency";
 export type SortBy = "newest" | "price" | "area";
 export type SortOrder = "asc" | "desc";
 
-// Mirrors the GET /listings query params (app/api/routes/listing.ts,
-// lib/api/listingFilters.ts, lib/api/queryParams.ts, repo root). All
-// optional — an absent field means "no filter", matching the backend's
-// "unset param" semantics exactly (i.e. the default is "Any").
+// Mirrors the GET /listings query params
 export interface ListingFilters {
   city?: string;
   district?: string;

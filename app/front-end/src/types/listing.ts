@@ -18,10 +18,7 @@ export interface ListingSummaryDto {
   size: ListingSize;
 }
 
-// Mirrors lib/api/listingDto.ts ListingDetailDto — the shape returned by
-// GET /listings/:id. Not consumed by the home page yet, but defined now so
-// the future listing detail page doesn't need a second pass through
-// src/types/.
+// Mirrors lib/api/listingDto.ts ListingDetailDto
 export interface ListingDetailDto {
   id: string;
   source: string;

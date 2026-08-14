@@ -3,6 +3,7 @@ import SearchBar from "../components/SearchBar";
 import FilterPanel from "../components/FilterPanel";
 import TrendingOffers from "../components/TrendingOffers";
 import type { ListingFilters } from "../types/filters";
+import type { SearchMode } from "../types/search";
 import styles from "./styles/HomePage.module.css";
 
 export default function HomePage() {
@@ -19,9 +20,13 @@ export default function HomePage() {
   }
 
   // Same destination as FilterPanel's Apply — ListingsPage sees the `q`
-  // param and calls GET /search instead of GET /listings.
-  function handleSearch(query: string) {
-    navigate(`/listings?${new URLSearchParams({ q: query }).toString()}`);
+  // param and calls GET /search instead of GET /listings. `mode` is only
+  // added when AI search was picked — omitting it for the default keyword
+  // mode keeps existing/plain search URLs unchanged.
+  function handleSearch(query: string, mode: SearchMode) {
+    const params = new URLSearchParams({ q: query });
+    if (mode === "ai") params.set("mode", mode);
+    navigate(`/listings?${params.toString()}`);
   }
 
   return (

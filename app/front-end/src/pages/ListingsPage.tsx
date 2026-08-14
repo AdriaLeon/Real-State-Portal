@@ -6,7 +6,7 @@ import { ApiError } from "../api/client";
 import type { ListingFilters } from "../types/filters";
 import type { ListingSummaryDto } from "../types/listing";
 import type { PaginationMeta } from "../types/pagination";
-import type { DetectedFilters } from "../types/search";
+import type { AIDetectedFilters, DetectedFilters, SearchMode } from "../types/search";
 import ListingCard from "../components/ListingCard";
 import styles from "./styles/ListingsPage.module.css";
 
@@ -17,7 +17,12 @@ type LoadState =
       status: "success";
       listings: ListingSummaryDto[];
       pagination: PaginationMeta;
-      detected: DetectedFilters | null;
+      detected: DetectedFilters | AIDetectedFilters | null;
+      // The mode the backend actually used to produce `detected` — may
+      // differ from the requested mode on an AI fallback (see `warning`).
+      // Needed to know which of DetectedFilters/AIDetectedFilters this is.
+      resultMode: SearchMode | null;
+      warning: string | null;
     };
 
 // Reads the filters HomePage's FilterPanel encoded into the query string
@@ -99,6 +104,28 @@ function describeDetectedFilters(detected: DetectedFilters): string[] {
   return chips;
 }
 
+// AI-mode counterpart of describeDetectedFilters — covers the wider filter
+// set AIDetectedFilters can carry (building type, ownership form, and
+// numeric price/area/room ranges instead of just relative bands).
+function describeAIDetectedFilters(detected: AIDetectedFilters): string[] {
+  const chips: string[] = [];
+  if (detected.city) chips.push(`City: ${detected.city}`);
+  if (detected.district) chips.push(`District: ${detected.district}`);
+  if (detected.buildingType) chips.push(`Building: ${detected.buildingType}`);
+  if (detected.ownershipForm) chips.push(`Ownership: ${detected.ownershipForm}`);
+  if (detected.minPrice != null) chips.push(`Min price: ${detected.minPrice.toLocaleString("pl-PL")} PLN`);
+  if (detected.maxPrice != null) chips.push(`Max price: ${detected.maxPrice.toLocaleString("pl-PL")} PLN`);
+  if (detected.minArea != null) chips.push(`Min area: ${detected.minArea} m²`);
+  if (detected.maxArea != null) chips.push(`Max area: ${detected.maxArea} m²`);
+  if (detected.minRooms != null) chips.push(`Min rooms: ${detected.minRooms}`);
+  if (detected.maxRooms != null) chips.push(`Max rooms: ${detected.maxRooms}`);
+  if (detected.marketType) chips.push(detected.marketType === "primary" ? "Primary market" : "Secondary market");
+  if (detected.sellerType) chips.push(detected.sellerType === "agency" ? "Agency" : "Private seller");
+  if (detected.hasElevator) chips.push("Has elevator");
+  for (const amenity of detected.amenities) chips.push(`Amenity: ${amenity}`);
+  return chips;
+}
+
 export default function ListingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<LoadState>({ status: "loading" });
@@ -107,26 +134,35 @@ export default function ListingsPage() {
   // mutually exclusive request modes — the backend's GET /search ignores
   // filter params entirely, so whichever produced this URL wins outright.
   const q = searchParams.get("q");
+  const mode: SearchMode | undefined = searchParams.get("mode") === "ai" ? "ai" : undefined;
   const filters = parseFiltersFromSearchParams(searchParams);
 
-  const chips = q
-    ? [`Search: "${q}"`, ...(state.status === "success" && state.detected ? describeDetectedFilters(state.detected) : [])]
-    : describeFilters(filters);
+  const detectedChips =
+    state.status === "success" && state.detected
+      ? state.resultMode === "ai"
+        ? describeAIDetectedFilters(state.detected as AIDetectedFilters)
+        : describeDetectedFilters(state.detected as DetectedFilters)
+      : [];
+  const chips = q ? [`Search: "${q}"`, ...detectedChips] : describeFilters(filters);
 
   useEffect(() => {
     let cancelled = false;
     setState({ status: "loading" });
 
     const request = q
-      ? search(q, { page: filters.page }).then((res) => ({
+      ? search(q, { page: filters.page, mode }).then((res) => ({
           listings: res.data,
           pagination: res.pagination,
           detected: res.detected,
+          resultMode: res.mode,
+          warning: res.warning,
         }))
       : getListings(filters).then((res) => ({
           listings: res.data,
           pagination: res.pagination,
           detected: null,
+          resultMode: null,
+          warning: null,
         }));
 
     request
@@ -159,6 +195,11 @@ export default function ListingsPage() {
           ← New search
         </Link>
         <h1 className={styles.title}>Search results</h1>
+        {state.status === "success" && state.warning && (
+          <p className={styles.warning} role="alert">
+            {state.warning}
+          </p>
+        )}
         {chips.length > 0 && (
           <div className={styles.chips}>
             {chips.map((chip) => (

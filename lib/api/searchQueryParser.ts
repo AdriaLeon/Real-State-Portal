@@ -92,6 +92,11 @@ const AMENITY_SYNONYMS: Record<string, string> = {
   strych: "strych",
 };
 
+// Deduped canonical amenity values (the right-hand side of AMENITY_SYNONYMS),
+// e.g. for constraining the AI parser's structured-output schema to the same
+// vocabulary this regex parser recognizes (see lib/ai/searchQueryAI.ts).
+export const CANONICAL_AMENITIES: string[] = [...new Set(Object.values(AMENITY_SYNONYMS))];
+
 const ELEVATOR_PHRASES = ["elevator", "winda"];
 
 const SELLER_TYPE_CANDIDATES: { value: SellerType; phrases: string[] }[] = [
@@ -115,6 +120,26 @@ const AREA_BAND_CANDIDATES: { value: "small" | "big"; phrases: string[] }[] = [
   { value: "big", phrases: ["big", "large", "duży", "duża", "duże"] },
 ];
 
+// Translates an already-detected filter set into the Prisma where-clause
+// that applies it so AI parser has it into account when generating the structured output. This is a separate function
+export function detectedFiltersToWhere(detected: DetectedFilters, stats: MarketStats): Prisma.ListingWhereInput {
+  const { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand } = detected;
+
+  const and: Prisma.ListingWhereInput[] = [];
+  if (city !== null) and.push({ city: { equals: city } });
+  if (district !== null) and.push({ district: { equals: district } });
+  if (hasElevator) and.push({ hasElevator: true });
+  for (const term of amenities) and.push({ amenities: { array_contains: term } });
+  if (sellerType !== null) and.push({ sellerType });
+  if (marketType !== null) and.push({ marketType });
+  if (priceBand === "cheap") and.push({ price: { lte: stats.price.p25 } });
+  if (priceBand === "expensive") and.push({ price: { gte: stats.price.p75 } });
+  if (areaBand === "small") and.push({ area: { lte: stats.area.p25 } });
+  if (areaBand === "big") and.push({ area: { gte: stats.area.p75 } });
+
+  return and.length > 0 ? { AND: and } : {};
+}
+
 export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: MarketStats): ParsedSearchQuery {
   const lower = text.toLowerCase();
 
@@ -135,20 +160,6 @@ export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: M
   const priceBand = earliestMatch(lower, PRICE_BAND_CANDIDATES);
   const areaBand = earliestMatch(lower, AREA_BAND_CANDIDATES);
 
-  const and: Prisma.ListingWhereInput[] = [];
-  if (city !== null) and.push({ city: { equals: city } });
-  if (district !== null) and.push({ district: { equals: district } });
-  if (hasElevator) and.push({ hasElevator: true });
-  for (const term of amenities) and.push({ amenities: { array_contains: term } });
-  if (sellerType !== null) and.push({ sellerType });
-  if (marketType !== null) and.push({ marketType });
-  if (priceBand === "cheap") and.push({ price: { lte: stats.price.p25 } });
-  if (priceBand === "expensive") and.push({ price: { gte: stats.price.p75 } });
-  if (areaBand === "small") and.push({ area: { lte: stats.area.p25 } });
-  if (areaBand === "big") and.push({ area: { gte: stats.area.p75 } });
-
-  return {
-    where: and.length > 0 ? { AND: and } : {},
-    detected: { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand },
-  };
+  const detected: DetectedFilters = { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand };
+  return { where: detectedFiltersToWhere(detected, stats), detected };
 }

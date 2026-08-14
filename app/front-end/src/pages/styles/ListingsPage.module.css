@@ -61,6 +61,16 @@
   color: var(--color-text-muted);
 }
 
+.warning {
+  margin: var(--spacing-xs) 0 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid #f5c451;
+  border-radius: var(--radius);
+  background: #fdf6e3;
+  color: #7a5b00;
+  font-size: 0.9rem;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
