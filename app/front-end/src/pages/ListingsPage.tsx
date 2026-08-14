@@ -1,0 +1,173 @@
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { getListings } from "../api/listings";
+import { ApiError } from "../api/client";
+import type { ListingFilters } from "../types/filters";
+import type { ListingSummaryDto } from "../types/listing";
+import type { PaginationMeta } from "../types/pagination";
+import ListingCard from "../components/ListingCard";
+import styles from "./styles/ListingsPage.module.css";
+
+type LoadState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "success"; listings: ListingSummaryDto[]; pagination: PaginationMeta };
+
+// Reads the filters HomePage's FilterPanel encoded into the query string
+// back out into a typed ListingFilters — keeps the URL as the single source
+// of truth so results are shareable/bookmarkable and survive a page reload.
+function parseFiltersFromSearchParams(params: URLSearchParams): ListingFilters {
+  const filters: ListingFilters = {};
+
+  const city = params.get("city");
+  if (city) filters.city = city;
+  const district = params.get("district");
+  if (district) filters.district = district;
+  const buildingType = params.get("buildingType");
+  if (buildingType) filters.buildingType = buildingType;
+  const ownershipForm = params.get("ownershipForm");
+  if (ownershipForm) filters.ownershipForm = ownershipForm;
+
+  const minPrice = params.get("minPrice");
+  if (minPrice) filters.minPrice = Number(minPrice);
+  const maxPrice = params.get("maxPrice");
+  if (maxPrice) filters.maxPrice = Number(maxPrice);
+  const minArea = params.get("minArea");
+  if (minArea) filters.minArea = Number(minArea);
+  const maxArea = params.get("maxArea");
+  if (maxArea) filters.maxArea = Number(maxArea);
+  const minRooms = params.get("minRooms");
+  if (minRooms) filters.minRooms = Number(minRooms);
+  const maxRooms = params.get("maxRooms");
+  if (maxRooms) filters.maxRooms = Number(maxRooms);
+
+  const marketType = params.get("marketType");
+  if (marketType === "primary" || marketType === "secondary") filters.marketType = marketType;
+  const sellerType = params.get("sellerType");
+  if (sellerType === "private" || sellerType === "agency") filters.sellerType = sellerType;
+  const hasElevator = params.get("hasElevator");
+  if (hasElevator === "true" || hasElevator === "false") filters.hasElevator = hasElevator === "true";
+
+  const page = params.get("page");
+  if (page) filters.page = Number(page);
+
+  return filters;
+}
+
+// Human-readable summary of the active filters, shown above the results so
+// it's clear what's being searched for.
+function describeFilters(filters: ListingFilters): string[] {
+  const chips: string[] = [];
+  if (filters.city) chips.push(`City: ${filters.city}`);
+  if (filters.district) chips.push(`District: ${filters.district}`);
+  if (filters.minPrice) chips.push(`Min price: ${filters.minPrice.toLocaleString("pl-PL")} PLN`);
+  if (filters.maxPrice) chips.push(`Max price: ${filters.maxPrice.toLocaleString("pl-PL")} PLN`);
+  if (filters.minArea) chips.push(`Min area: ${filters.minArea} m²`);
+  if (filters.maxArea) chips.push(`Max area: ${filters.maxArea} m²`);
+  if (filters.minRooms) chips.push(`Min rooms: ${filters.minRooms}`);
+  if (filters.maxRooms) chips.push(`Max rooms: ${filters.maxRooms}`);
+  if (filters.marketType) chips.push(filters.marketType === "primary" ? "Primary market" : "Secondary market");
+  if (filters.sellerType) chips.push(filters.sellerType === "agency" ? "Agency" : "Private seller");
+  if (filters.hasElevator !== undefined) chips.push(filters.hasElevator ? "Has elevator" : "No elevator");
+  if (filters.buildingType) chips.push(`Building: ${filters.buildingType}`);
+  if (filters.ownershipForm) chips.push(`Ownership: ${filters.ownershipForm}`);
+  return chips;
+}
+
+export default function ListingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [state, setState] = useState<LoadState>({ status: "loading" });
+
+  const filters = parseFiltersFromSearchParams(searchParams);
+  const chips = describeFilters(filters);
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+
+    getListings(filters)
+      .then((res) => {
+        if (!cancelled) setState({ status: "success", listings: res.data, pagination: res.pagination });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const message = err instanceof ApiError ? err.message : "Failed to load listings.";
+        setState({ status: "error", message });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Depend on the serialized string, not `filters`/`searchParams` objects
+    // directly — those are recreated every render and would refetch in a loop.
+  }, [searchParams.toString()]);
+
+  function goToPage(page: number) {
+    const next = new URLSearchParams(searchParams);
+    next.set("page", String(page));
+    setSearchParams(next);
+  }
+
+  return (
+    <main className={styles.page}>
+      <div className={styles.header}>
+        <Link to="/" className={styles.backLink}>
+          ← New search
+        </Link>
+        <h1 className={styles.title}>Search results</h1>
+        {chips.length > 0 && (
+          <div className={styles.chips}>
+            {chips.map((chip) => (
+              <span key={chip} className={styles.chip}>
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
+        {state.status === "success" && (
+          <p className={styles.summary}>{state.pagination.total} listings found</p>
+        )}
+      </div>
+
+      {state.status === "loading" && <p className={styles.status}>Loading listings…</p>}
+      {state.status === "error" && (
+        <p className={styles.status} role="alert">
+          {state.message}
+        </p>
+      )}
+      {state.status === "success" && state.listings.length === 0 && (
+        <p className={styles.status}>No listings match these filters.</p>
+      )}
+
+      {state.status === "success" && state.listings.length > 0 && (
+        <>
+          <div className={styles.grid}>
+            {state.listings.map((listing) => (
+              <ListingCard key={listing.id} listing={listing} />
+            ))}
+          </div>
+
+          <div className={styles.pagination}>
+            <button
+              type="button"
+              onClick={() => goToPage(state.pagination.page - 1)}
+              disabled={state.pagination.page <= 1}
+            >
+              Previous
+            </button>
+            <span>
+              Page {state.pagination.page} of {state.pagination.totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => goToPage(state.pagination.page + 1)}
+              disabled={state.pagination.page >= state.pagination.totalPages}
+            >
+              Next
+            </button>
+          </div>
+        </>
+      )}
+    </main>
+  );
+}

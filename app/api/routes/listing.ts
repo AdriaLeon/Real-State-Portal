@@ -2,6 +2,7 @@ import { Router } from "express";
 import type { NextFunction, Request, Response } from "express";
 import { toListingDetailDto, toListingSummaryDto } from "../../../lib/api/listingDto.js";
 import { buildListingOrderBy, buildListingWhere } from "../../../lib/api/listingFilters.js";
+import { getListingFacets } from "../../../lib/api/listingFacets.js";
 import { parsePagination } from "../../../lib/api/queryParams.js";
 import { prisma } from "../db.js";
 
@@ -28,6 +29,18 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       data: rows.map(toListingSummaryDto),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /listings/facets — distinct city/district/buildingType/ownershipForm
+// values present in the data, for populating filter dropdowns. Registered
+// before GET /listings/:id so "facets" isn't swallowed as an :id.
+router.get("/facets", async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const facets = await getListingFacets();
+    res.json(facets);
   } catch (err) {
     next(err);
   }

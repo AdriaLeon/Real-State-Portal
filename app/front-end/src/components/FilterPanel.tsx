@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { getListingFacets } from "../api/listings";
+import type { ListingFacets } from "../types/facets";
 import type { ListingFilters, MarketType, SellerType } from "../types/filters";
 import styles from "./styles/FilterPanel.module.css";
+
+const EMPTY_FACETS: ListingFacets = { cities: [], districts: [], buildingTypes: [], ownershipForms: [] };
 
 interface FilterFormState {
   city: string;
@@ -37,8 +41,8 @@ const DEFAULT_FORM_STATE: FilterFormState = {
 };
 
 // Converts form strings into the typed query-param object the API layer
-// expects. Not wired to a real request yet (out of scope for this page),
-// but keeps FilterPanel ready to be wired up without a redesign.
+// expects. Passed to onApply, which HomePage uses to navigate to
+// /listings?<query> — see ListingsPage for how it's read back out.
 function toListingFilters(form: FilterFormState): ListingFilters {
   const filters: ListingFilters = {};
   if (form.city) filters.city = form.city;
@@ -58,12 +62,29 @@ function toListingFilters(form: FilterFormState): ListingFilters {
 }
 
 export interface FilterPanelProps {
-  onApply?: (filters: ListingFilters) => void; // unused today; hook for future wiring
+  onApply?: (filters: ListingFilters) => void;
 }
 
 export default function FilterPanel({ onApply }: FilterPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [form, setForm] = useState<FilterFormState>(DEFAULT_FORM_STATE);
+  const [facets, setFacets] = useState<ListingFacets>(EMPTY_FACETS);
+
+  // Fetched once on mount (not on every panel open) and reused for the
+  // lifetime of the component — the dropdown options rarely change.
+  useEffect(() => {
+    let cancelled = false;
+    getListingFacets()
+      .then((res) => {
+        if (!cancelled) setFacets(res);
+      })
+      .catch(() => {
+        // Non-critical: dropdowns just stay "Any"-only if this fails.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function update<K extends keyof FilterFormState>(key: K, value: FilterFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -95,15 +116,25 @@ export default function FilterPanel({ onApply }: FilterPanelProps) {
           <form onSubmit={handleApply} className={styles.grid}>
             <label>
               City
-              <input value={form.city} onChange={(e) => update("city", e.target.value)} placeholder="Any" />
+              <select value={form.city} onChange={(e) => update("city", e.target.value)}>
+                <option value="">Any</option>
+                {facets.cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               District
-              <input
-                value={form.district}
-                onChange={(e) => update("district", e.target.value)}
-                placeholder="Any"
-              />
+              <select value={form.district} onChange={(e) => update("district", e.target.value)}>
+                <option value="">Any</option>
+                {facets.districts.map((district) => (
+                  <option key={district} value={district}>
+                    {district}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Min price
@@ -194,19 +225,25 @@ export default function FilterPanel({ onApply }: FilterPanelProps) {
             </label>
             <label>
               Building type
-              <input
-                value={form.buildingType}
-                onChange={(e) => update("buildingType", e.target.value)}
-                placeholder="Any"
-              />
+              <select value={form.buildingType} onChange={(e) => update("buildingType", e.target.value)}>
+                <option value="">Any</option>
+                {facets.buildingTypes.map((buildingType) => (
+                  <option key={buildingType} value={buildingType}>
+                    {buildingType}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Ownership form
-              <input
-                value={form.ownershipForm}
-                onChange={(e) => update("ownershipForm", e.target.value)}
-                placeholder="Any"
-              />
+              <select value={form.ownershipForm} onChange={(e) => update("ownershipForm", e.target.value)}>
+                <option value="">Any</option>
+                {facets.ownershipForms.map((ownershipForm) => (
+                  <option key={ownershipForm} value={ownershipForm}>
+                    {ownershipForm}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <div className={styles.actions}>
