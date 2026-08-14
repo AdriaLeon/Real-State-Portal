@@ -1,0 +1,18 @@
+.section {
+  margin-top: var(--spacing-xl);
+}
+
+.heading {
+  margin: 0 0 var(--spacing-md);
+  font-size: 1.4rem;
+}
+
+.status {
+  color: var(--color-text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--spacing-md);
+}
