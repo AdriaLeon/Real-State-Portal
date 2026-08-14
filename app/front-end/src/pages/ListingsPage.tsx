@@ -97,6 +97,8 @@ function describeDetectedFilters(detected: DetectedFilters): string[] {
   if (detected.priceBand === "expensive") chips.push("Expensive");
   if (detected.areaBand === "small") chips.push("Small");
   if (detected.areaBand === "big") chips.push("Big");
+  if (detected.minRooms != null) chips.push(`Min rooms: ${detected.minRooms}`);
+  if (detected.maxRooms != null) chips.push(`Max rooms: ${detected.maxRooms}`);
   if (detected.marketType) chips.push(detected.marketType === "primary" ? "Primary market" : "Secondary market");
   if (detected.sellerType) chips.push(detected.sellerType === "agency" ? "Agency" : "Private seller");
   if (detected.hasElevator) chips.push("Has elevator");

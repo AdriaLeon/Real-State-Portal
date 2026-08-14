@@ -13,6 +13,8 @@ export interface DetectedFilters {
   marketType: MarketType | null;
   priceBand: "cheap" | "expensive" | null;
   areaBand: "small" | "big" | null;
+  minRooms: number | null;
+  maxRooms: number | null;
 }
 
 // What mode="ai" can detect — the full filter set FilterPanel offers

@@ -26,6 +26,8 @@ describe("parseSearchQuery", () => {
       marketType: null,
       priceBand: null,
       areaBand: null,
+      minRooms: null,
+      maxRooms: null,
     });
   });
 
@@ -36,6 +38,11 @@ describe("parseSearchQuery", () => {
 
   it("is case-insensitive for city matching", () => {
     expect(parseSearchQuery("flat in KRAKÓW", vocab, stats).detected.city).toBe("Kraków");
+  });
+
+  it("is diacritic-insensitive for city matching", () => {
+    expect(parseSearchQuery("flat in krakow", vocab, stats).detected.city).toBe("Kraków");
+    expect(parseSearchQuery("flat in Wroclaw", vocab, stats).detected.city).toBe("Wrocław");
   });
 
   it("detects a multi-word district", () => {
@@ -154,6 +161,47 @@ describe("parseSearchQuery", () => {
     const { where } = parseSearchQuery("balcony and garden", vocab, stats);
     expect(where).toEqual({
       AND: [{ amenities: { array_contains: "balkon" } }, { amenities: { array_contains: "ogródek" } }],
+    });
+  });
+
+  describe("rooms", () => {
+    it("detects an exact room count in English and Polish phrasing", () => {
+      expect(parseSearchQuery("3 rooms in Kraków", vocab, stats).detected).toMatchObject({
+        minRooms: 3,
+        maxRooms: 3,
+      });
+      expect(parseSearchQuery("mieszkanie 3-pokojowe", vocab, stats).detected).toMatchObject({
+        minRooms: 3,
+        maxRooms: 3,
+      });
+      expect(parseSearchQuery("2pokojowe mieszkanie", vocab, stats).detected).toMatchObject({
+        minRooms: 2,
+        maxRooms: 2,
+      });
+    });
+
+    it("detects an at-least room count", () => {
+      expect(parseSearchQuery("3+ rooms", vocab, stats).detected).toMatchObject({ minRooms: 3, maxRooms: null });
+      expect(parseSearchQuery("at least 2 pokoje", vocab, stats).detected).toMatchObject({
+        minRooms: 2,
+        maxRooms: null,
+      });
+    });
+
+    it("detects an at-most room count", () => {
+      expect(parseSearchQuery("up to 4 rooms", vocab, stats).detected).toMatchObject({
+        minRooms: null,
+        maxRooms: 4,
+      });
+    });
+
+    it("maps a detected room count to a Prisma range clause", () => {
+      expect(parseSearchQuery("3 rooms", vocab, stats).where).toEqual({
+        AND: [{ rooms: { gte: 3, lte: 3 } }],
+      });
+      expect(parseSearchQuery("3+ rooms", vocab, stats).where).toEqual({
+        AND: [{ rooms: { gte: 3 } }],
+      });
     });
   });
 });

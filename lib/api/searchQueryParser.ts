@@ -15,6 +15,8 @@ export interface DetectedFilters {
   marketType: MarketType | null;
   priceBand: "cheap" | "expensive" | null;
   areaBand: "small" | "big" | null;
+  minRooms: number | null;
+  maxRooms: number | null;
 }
 
 export interface ParsedSearchQuery {
@@ -26,12 +28,25 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Lowercases and strips diacritics so accented and unaccented spellings
+// match each other (e.g. "krakow" vs "Kraków"). NFD decomposes most
+// accented Latin letters into base + combining mark, which the regex then
+// strips; Polish "ł"/"Ł" don't decompose that way, so they're handled
+// manually.
+function normalize(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ł/g, "l")
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
 // Index of the first match of `phrase` in `text` as a whole word/phrase
 // (Unicode letter/digit boundary on both sides), or -1 if absent. Both
-// arguments are expected already lowercased by the caller.
+// arguments are normalized (case/diacritic-insensitive) internally.
 function matchIndex(text: string, phrase: string): number {
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(phrase)}(?![\\p{L}\\p{N}])`, "u");
-  const m = re.exec(text);
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(normalize(phrase))}(?![\\p{L}\\p{N}])`, "u");
+  const m = re.exec(normalize(text));
   return m ? m.index : -1;
 }
 
@@ -59,7 +74,7 @@ function earliestMatch<T>(text: string, candidates: { value: T; phrases: string[
 function earliestVocabMatch(text: string, vocab: string[]): string | null {
   let best: { value: string; index: number; length: number } | null = null;
   for (const value of vocab) {
-    const index = matchIndex(text, value.toLowerCase());
+    const index = matchIndex(text, value);
     if (index === -1) continue;
     if (best === null || index < best.index || (index === best.index && value.length > best.length)) {
       best = { value, index, length: value.length };
@@ -120,10 +135,40 @@ const AREA_BAND_CANDIDATES: { value: "small" | "big"; phrases: string[] }[] = [
   { value: "big", phrases: ["big", "large", "duży", "duża", "duże"] },
 ];
 
+// Matches English "room(s)" and any Polish inflection of "pokój" (pokoje,
+// pokoi, pokojowe, pokojowy, pokojami, ...) — normalization turns ó -> o,
+// so they all share the "poko" root.
+const ROOM_WORD = "(?:rooms?|poko\\w*)";
+const MIN_ROOMS_RE = new RegExp(`(?:at least|min(?:imum)?|co najmniej)\\s*(\\d+)\\s*-?\\s*${ROOM_WORD}`);
+const ROOMS_PLUS_RE = new RegExp(`(\\d+)\\s*\\+\\s*${ROOM_WORD}`);
+const MAX_ROOMS_RE = new RegExp(`(?:at most|up to|max(?:imum)?|maksymalnie)\\s*(\\d+)\\s*-?\\s*${ROOM_WORD}`);
+const EXACT_ROOMS_RE = new RegExp(`(\\d+)\\s*-?\\s*${ROOM_WORD}`);
+
+// Extracts an explicit room count from already-normalized text, e.g.
+// "3 rooms"/"3-pokojowe" (exact), "3+ rooms"/"at least 2 pokoje" (min
+// only), "up to 4 rooms" (max only). Checked in this order so a qualified
+// phrase like "at least 3 rooms" doesn't fall through to the exact case.
+function extractRoomRange(text: string): { minRooms: number | null; maxRooms: number | null } {
+  const min = MIN_ROOMS_RE.exec(text) ?? ROOMS_PLUS_RE.exec(text);
+  if (min) return { minRooms: Number(min[1]), maxRooms: null };
+
+  const max = MAX_ROOMS_RE.exec(text);
+  if (max) return { minRooms: null, maxRooms: Number(max[1]) };
+
+  const exact = EXACT_ROOMS_RE.exec(text);
+  if (exact) {
+    const n = Number(exact[1]);
+    return { minRooms: n, maxRooms: n };
+  }
+
+  return { minRooms: null, maxRooms: null };
+}
+
 // Translates an already-detected filter set into the Prisma where-clause
 // that applies it so AI parser has it into account when generating the structured output. This is a separate function
 export function detectedFiltersToWhere(detected: DetectedFilters, stats: MarketStats): Prisma.ListingWhereInput {
-  const { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand } = detected;
+  const { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand, minRooms, maxRooms } =
+    detected;
 
   const and: Prisma.ListingWhereInput[] = [];
   if (city !== null) and.push({ city: { equals: city } });
@@ -136,12 +181,18 @@ export function detectedFiltersToWhere(detected: DetectedFilters, stats: MarketS
   if (priceBand === "expensive") and.push({ price: { gte: stats.price.p75 } });
   if (areaBand === "small") and.push({ area: { lte: stats.area.p25 } });
   if (areaBand === "big") and.push({ area: { gte: stats.area.p75 } });
+  if (minRooms !== null || maxRooms !== null) {
+    const range: { gte?: number; lte?: number } = {};
+    if (minRooms !== null) range.gte = minRooms;
+    if (maxRooms !== null) range.lte = maxRooms;
+    and.push({ rooms: range });
+  }
 
   return and.length > 0 ? { AND: and } : {};
 }
 
 export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: MarketStats): ParsedSearchQuery {
-  const lower = text.toLowerCase();
+  const lower = normalize(text);
 
   // City and district are detected independently of each other.
   const city = earliestVocabMatch(lower, vocab.cities);
@@ -159,7 +210,19 @@ export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: M
   const marketType = earliestMatch(lower, MARKET_TYPE_CANDIDATES);
   const priceBand = earliestMatch(lower, PRICE_BAND_CANDIDATES);
   const areaBand = earliestMatch(lower, AREA_BAND_CANDIDATES);
+  const { minRooms, maxRooms } = extractRoomRange(lower);
 
-  const detected: DetectedFilters = { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand };
+  const detected: DetectedFilters = {
+    city,
+    district,
+    amenities,
+    hasElevator,
+    sellerType,
+    marketType,
+    priceBand,
+    areaBand,
+    minRooms,
+    maxRooms,
+  };
   return { where: detectedFiltersToWhere(detected, stats), detected };
 }
