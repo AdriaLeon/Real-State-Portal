@@ -1,11 +1,3 @@
-// Pure, framework-agnostic parsers for values coming out of Express's
-// req.query (string | string[] | ParsedQs | ParsedQs[] | undefined).
-//
-// Each throws a QueryParamError with a human-readable message on invalid
-// input rather than silently ignoring or coercing it — a malformed filter
-// silently dropped would return a confusingly wrong result set instead of an
-// obvious 400.
-
 export class QueryParamError extends Error {
   constructor(message: string) {
     super(message);
@@ -13,8 +5,7 @@ export class QueryParamError extends Error {
   }
 }
 
-// Rejects repeated params (?city=A&city=B) rather than silently taking the
-// first — most likely a client bug, not intentional.
+// Rejects repeated params (?city=A&city=B), most likely a client bug, not intentional.
 function asSingleString(raw: unknown, name: string): string | undefined {
   if (raw === undefined) return undefined;
   if (Array.isArray(raw)) throw new QueryParamError(`"${name}" must be given only once`);
