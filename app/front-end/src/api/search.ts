@@ -12,7 +12,8 @@ export interface SearchParams {
 
 // GET /search — mirrors app/api/routes/search.ts (repo root). The backend
 // parses `q` into structured filters (city, district, amenities, elevator,
-// seller/market type, price & area bands).
-export function search(q: string, params: SearchParams = {}): Promise<SearchResult> {
-  return apiGet<SearchResult>("/search", { q, ...params } as Record<string, unknown>);
+// seller/market type, price & area bands). `signal` lets a caller cancel a
+// superseded request (see ListingsPage.tsx).
+export function search(q: string, params: SearchParams = {}, signal?: AbortSignal): Promise<SearchResult> {
+  return apiGet<SearchResult>("/search", { q, ...params } as Record<string, unknown>, signal);
 }

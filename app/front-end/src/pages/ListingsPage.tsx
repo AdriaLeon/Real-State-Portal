@@ -148,18 +148,18 @@ export default function ListingsPage() {
   const chips = q ? [`Search: "${q}"`, ...detectedChips] : describeFilters(filters);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     setState({ status: "loading" });
 
     const request = q
-      ? search(q, { page: filters.page, mode }).then((res) => ({
+      ? search(q, { page: filters.page, mode }, controller.signal).then((res) => ({
           listings: res.data,
           pagination: res.pagination,
           detected: res.detected,
           resultMode: res.mode,
           warning: res.warning,
         }))
-      : getListings(filters).then((res) => ({
+      : getListings(filters, controller.signal).then((res) => ({
           listings: res.data,
           pagination: res.pagination,
           detected: null,
@@ -169,16 +169,16 @@ export default function ListingsPage() {
 
     request
       .then((result) => {
-        if (!cancelled) setState({ status: "success", ...result });
+        setState({ status: "success", ...result });
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (err instanceof DOMException && err.name === "AbortError") return; // superseded by a newer request
         const message = err instanceof ApiError ? err.message : "Failed to load listings.";
         setState({ status: "error", message });
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
     // Depend on the serialized string, not `filters`/`searchParams` objects
     // directly — those are recreated every render and would refetch in a loop.

@@ -25,14 +25,18 @@ function buildQueryString(params?: Record<string, unknown>): string {
 
 // Centralized GET helper: builds the URL, parses JSON, and normalizes both
 // backend error responses ({error: string}) and network failures into
-// ApiError so callers never touch raw fetch/Response objects.
-export async function apiGet<T>(path: string, params?: Record<string, unknown>): Promise<T> {
+// ApiError so callers never touch raw fetch/Response objects. An optional
+// AbortSignal lets a caller cancel a superseded request; an abort is
+// rethrown as-is (not wrapped in ApiError) so callers can tell "cancelled"
+// apart from "actually failed" via `err.name === "AbortError"`.
+export async function apiGet<T>(path: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<T> {
   const url = `${API_BASE_URL}${path}${buildQueryString(params)}`;
 
   let response: Response;
   try {
-    response = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-  } catch {
+    response = await fetch(url, { method: "GET", headers: { Accept: "application/json" }, signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err;
     throw new ApiError("Network error: could not reach the server", 0);
   }
 
