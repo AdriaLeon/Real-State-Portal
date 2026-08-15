@@ -100,6 +100,48 @@ npm run dev:front
 
 ---
 
+## Uses cases
+
+### 1. User searches for an apartment in Warszawa with an elevator and at least 2 rooms.
+
+The user goes to the main page looking for a property that matches their requirements. They are planning to move to Warszawa with their newborn and specifically want an apartment with an elevator so they can easily access their home with a baby stroller.
+
+They click the Filters button, which opens a form containing the available search criteria.
+
+The user selects Warszawa from the city dropdown, enables the elevator filter, and selects blok as the building type. They then set the minimum number of rooms to 2 and click Apply.
+
+The application searches the available listings and displays only the properties that satisfy the selected criteria. The user compares the preview information of the returned listings and selects the one that appears most relevant to their needs.
+
+After selecting a listing, the application opens its details page, where the user can view the available images, full description, AI-generated summary (if available), and other property information.
+
+After reviewing the listing, the user can select "I'm interested" to indicate their interest in the property. Currently, this button is a placeholder for a future seller-contact functionality.
+
+
+### 2. User uses a query to search for offers without being specific with AI
+
+The user goes to the main page looking for a property without having a precise set of requirements. They are mainly looking for something affordable, with enough space for a bedroom and a home gym, while still being relatively small and easy to maintain. They would also prefer a high floor, as they are interested in having good views of the city.
+
+The user goes to the search bar, enables AI mode, and enters:
+
+> `"I want a cheap place where I can fit my bedroom and a gym. A small house is fine as long as it is on a high floor."` 
+
+After pressing Search, the AI search system interprets the natural-language query and translates the supported requirements into structured filters:
+
+- `"Cheap place"` --> Max price: 607 475 PLN, based on the 25th percentile of prices in the dataset.
+- `"Where I can fit my bedroom and a gym"` --> Min rooms: 2
+- `"Small house is fine`" --> Max area: 37.75m², based on the 25th percentile of prices in the dataset.
+- `"High floor"` --> Min floor: 3
+
+The application then searches the available listings and displays only the properties that satisfy the generated criteria if they exist. Then the listing page opens, on top of it, the user can verify its query and how has it been translated into different filters.
+
+Then, the user compares the preview information of the returned listings and selects the one that appears most relevant to their needs.
+
+After selecting a listing, the application opens its details page, where the user can view the available images, full description, AI-generated summary (if available), and other property information.
+
+After reviewing the listing, the user can select "I am interested" to indicate their interest in the property. Currently, this button is a placeholder for a future seller-contact functionality.
+
+---
+
 ## Functionalities
 
 ### 1. Trending Offers

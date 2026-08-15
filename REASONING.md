@@ -62,7 +62,7 @@ This way, AI can directly recognize non-registered patters, such as `"A couple o
 
 This approach also makes the search system more flexible when users combine several criteria or describe their preferences in a vague, conversational way, such as:
 
-> `Premium flat with a lot of space and at least a couple of rooms`
+> `"Premium flat with a lot of space and at least a couple of rooms"`
 
 can be interpreted into filters such as:
 
