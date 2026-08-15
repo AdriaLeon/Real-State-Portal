@@ -2,6 +2,8 @@
 
 A full-stack smart real estate listings platform that crawls, normalizes, enriches, and serves real estate data through a modern web interface with AI-powered search and summarization.
 
+> **For architecture decisions, assumptions, and design choices, see [REASONING.md](./REASONING.md)**
+
 ## Technology Stack
 
 ### Frontend
