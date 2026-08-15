@@ -29,6 +29,8 @@ export interface AIDetectedFilters {
   maxArea: number | null;
   minRooms: number | null;
   maxRooms: number | null;
+  minFloor: number | null;
+  maxFloor: number | null;
 }
 
 function sleep(ms: number) {
@@ -47,12 +49,32 @@ it directly (assume PLN for prices unless stated otherwise). "Exactly N rooms" /
 set both minRooms and maxRooms to N. "At least N rooms" / "N+ rooms" -> minRooms only. "At most N
 rooms" / "up to N rooms" -> maxRooms only. Same min/max logic for price and area.
 
+For minFloor/maxFloor: apply the same logic as rooms — "exactly floor N" / "on the Nth floor" ->
+set both minFloor and maxFloor to N. "At least floor N" / "floor N or higher" -> minFloor only.
+"At most floor N" / "no higher than floor N" -> maxFloor only. "Ground floor" or "parter" (the
+Polish term) always means floor 0 exactly -> set both minFloor and maxFloor to 0, regardless of
+whether a number is mentioned.
+
+Vague quantity phrases with no explicit number should also be inferred, using reasonable everyday
+judgment: "a couple of rooms" -> minRooms=2, maxRooms=2; "a few rooms" / "several rooms" ->
+minRooms=3 (no maxRooms); "studio" / "single room" -> minRooms=1, maxRooms=1. As with the price/area
+relative terms above, an explicit number in the query always takes priority over vague-phrase
+inference.
+
 If the query instead uses a vague relative term with NO explicit number, translate it using the
 dataset's percentile stats given below, and ONLY then: "cheap"/"budget"/"tani" -> maxPrice ~= the
 given 25th-percentile price; "expensive"/"luxury"/"drogi" -> minPrice ~= the given 75th-percentile
 price; "small"/"mały" -> maxArea ~= the given 25th-percentile area; "big"/"spacious"/"duży" ->
 minArea ~= the given 75th-percentile area. An explicit number in the query always takes priority
-over this relative-term inference.`;
+over this relative-term inference.
+
+Beyond the specific rules above, use reasonable judgment to infer numeric filters (price, area,
+rooms, floor) from descriptive or vague language in the query rather than leaving them null when
+the query's intent is reasonably clear, even if the exact phrasing isn't one of the patterns listed
+above. However, this license to infer applies ONLY to the numeric filters — city, district,
+buildingType, ownershipForm, and amenities must still be picked strictly from the provided closed
+vocabularies as instructed above, and must be left null/empty rather than guessed or approximated
+when the query doesn't clearly match a provided value.`;
 
 export function buildFilterExtractionPrompt(
   text: string,
@@ -94,6 +116,8 @@ export function buildFilterSchema(facets: ListingFacets): Record<string, unknown
       maxArea: numberOrNull,
       minRooms: numberOrNull,
       maxRooms: numberOrNull,
+      minFloor: numberOrNull,
+      maxFloor: numberOrNull,
     },
     required: [
       "city",
@@ -110,6 +134,8 @@ export function buildFilterSchema(facets: ListingFacets): Record<string, unknown
       "maxArea",
       "minRooms",
       "maxRooms",
+      "minFloor",
+      "maxFloor",
     ],
     additionalProperties: false,
   };
@@ -166,6 +192,7 @@ export function sanitizeDetectedFilters(raw: unknown, facets: ListingFacets): AI
   const [minPrice, maxPrice] = sanitizeRange(obj.minPrice, obj.maxPrice);
   const [minArea, maxArea] = sanitizeRange(obj.minArea, obj.maxArea);
   const [minRooms, maxRooms] = sanitizeRange(obj.minRooms, obj.maxRooms);
+  const [minFloor, maxFloor] = sanitizeRange(obj.minFloor, obj.maxFloor);
 
   return {
     city,
@@ -182,10 +209,12 @@ export function sanitizeDetectedFilters(raw: unknown, facets: ListingFacets): AI
     maxArea,
     minRooms,
     maxRooms,
+    minFloor,
+    maxFloor,
   };
 }
 
-function pushRange(and: Prisma.ListingWhereInput[], field: "price" | "area" | "rooms", min: number | null, max: number | null) {
+function pushRange(and: Prisma.ListingWhereInput[], field: "price" | "area" | "rooms" | "floor", min: number | null, max: number | null) {
   if (min === null && max === null) return;
   const range: { gte?: number; lte?: number } = {};
   if (min !== null) range.gte = min;
@@ -197,7 +226,7 @@ function pushRange(and: Prisma.ListingWhereInput[], field: "price" | "area" | "r
 // it — the AI-mode counterpart of detectedFiltersToWhere
 // (lib/api/searchQueryParser.ts), extended with the extra fields the AI
 // parser can fill in (building type, ownership form, and numeric
-// price/area/room ranges instead of just relative bands).
+// price/area/room/floor ranges instead of just relative bands).
 export function aiFiltersToWhere(detected: AIDetectedFilters): Prisma.ListingWhereInput {
   const and: Prisma.ListingWhereInput[] = [];
   if (detected.city !== null) and.push({ city: { equals: detected.city } });
@@ -211,6 +240,7 @@ export function aiFiltersToWhere(detected: AIDetectedFilters): Prisma.ListingWhe
   pushRange(and, "price", detected.minPrice, detected.maxPrice);
   pushRange(and, "area", detected.minArea, detected.maxArea);
   pushRange(and, "rooms", detected.minRooms, detected.maxRooms);
+  pushRange(and, "floor", detected.minFloor, detected.maxFloor);
 
   return and.length > 0 ? { AND: and } : {};
 }

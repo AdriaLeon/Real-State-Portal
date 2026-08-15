@@ -15,6 +15,8 @@ export interface DetectedFilters {
   areaBand: "small" | "big" | null;
   minRooms: number | null;
   maxRooms: number | null;
+  minFloor: number | null;
+  maxFloor: number | null;
 }
 
 // What mode="ai" can detect — the full filter set FilterPanel offers
@@ -35,6 +37,8 @@ export interface AIDetectedFilters {
   maxArea: number | null;
   minRooms: number | null;
   maxRooms: number | null;
+  minFloor: number | null;
+  maxFloor: number | null;
 }
 
 // "keyword" = regex/vocabulary matching, "ai" = Gemini-based extraction —

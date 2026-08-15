@@ -53,6 +53,13 @@ function parseFiltersFromSearchParams(params: URLSearchParams): ListingFilters {
   const maxRooms = params.get("maxRooms");
   if (maxRooms) filters.maxRooms = Number(maxRooms);
 
+  // Floor uses an explicit presence check (unlike rooms/price/area above) because 0
+  // (ground floor) is a real, common filter value that a truthy check would silently drop.
+  const minFloorRaw = params.get("minFloor");
+  if (minFloorRaw !== null) filters.minFloor = Number(minFloorRaw);
+  const maxFloorRaw = params.get("maxFloor");
+  if (maxFloorRaw !== null) filters.maxFloor = Number(maxFloorRaw);
+
   const marketType = params.get("marketType");
   if (marketType === "primary" || marketType === "secondary") filters.marketType = marketType;
   const sellerType = params.get("sellerType");
@@ -78,6 +85,8 @@ function describeFilters(filters: ListingFilters): string[] {
   if (filters.maxArea) chips.push(`Max area: ${filters.maxArea} m²`);
   if (filters.minRooms) chips.push(`Min rooms: ${filters.minRooms}`);
   if (filters.maxRooms) chips.push(`Max rooms: ${filters.maxRooms}`);
+  if (filters.minFloor !== undefined) chips.push(`Min floor: ${filters.minFloor}`);
+  if (filters.maxFloor !== undefined) chips.push(`Max floor: ${filters.maxFloor}`);
   if (filters.marketType) chips.push(filters.marketType === "primary" ? "Primary market" : "Secondary market");
   if (filters.sellerType) chips.push(filters.sellerType === "agency" ? "Agency" : "Private seller");
   if (filters.hasElevator !== undefined) chips.push(filters.hasElevator ? "Has elevator" : "No elevator");
@@ -99,6 +108,8 @@ function describeDetectedFilters(detected: DetectedFilters): string[] {
   if (detected.areaBand === "big") chips.push("Big");
   if (detected.minRooms != null) chips.push(`Min rooms: ${detected.minRooms}`);
   if (detected.maxRooms != null) chips.push(`Max rooms: ${detected.maxRooms}`);
+  if (detected.minFloor != null) chips.push(`Min floor: ${detected.minFloor}`);
+  if (detected.maxFloor != null) chips.push(`Max floor: ${detected.maxFloor}`);
   if (detected.marketType) chips.push(detected.marketType === "primary" ? "Primary market" : "Secondary market");
   if (detected.sellerType) chips.push(detected.sellerType === "agency" ? "Agency" : "Private seller");
   if (detected.hasElevator) chips.push("Has elevator");
@@ -108,7 +119,7 @@ function describeDetectedFilters(detected: DetectedFilters): string[] {
 
 // AI-mode counterpart of describeDetectedFilters — covers the wider filter
 // set AIDetectedFilters can carry (building type, ownership form, and
-// numeric price/area/room ranges instead of just relative bands).
+// numeric price/area/room/floor ranges instead of just relative bands).
 function describeAIDetectedFilters(detected: AIDetectedFilters): string[] {
   const chips: string[] = [];
   if (detected.city) chips.push(`City: ${detected.city}`);
@@ -121,6 +132,8 @@ function describeAIDetectedFilters(detected: AIDetectedFilters): string[] {
   if (detected.maxArea != null) chips.push(`Max area: ${detected.maxArea} m²`);
   if (detected.minRooms != null) chips.push(`Min rooms: ${detected.minRooms}`);
   if (detected.maxRooms != null) chips.push(`Max rooms: ${detected.maxRooms}`);
+  if (detected.minFloor != null) chips.push(`Min floor: ${detected.minFloor}`);
+  if (detected.maxFloor != null) chips.push(`Max floor: ${detected.maxFloor}`);
   if (detected.marketType) chips.push(detected.marketType === "primary" ? "Primary market" : "Secondary market");
   if (detected.sellerType) chips.push(detected.sellerType === "agency" ? "Agency" : "Private seller");
   if (detected.hasElevator) chips.push("Has elevator");

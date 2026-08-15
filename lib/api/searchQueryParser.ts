@@ -17,6 +17,8 @@ export interface DetectedFilters {
   areaBand: "small" | "big" | null;
   minRooms: number | null;
   maxRooms: number | null;
+  minFloor: number | null;
+  maxFloor: number | null;
 }
 
 export interface ParsedSearchQuery {
@@ -144,6 +146,18 @@ const ROOMS_PLUS_RE = new RegExp(`(\\d+)\\s*\\+\\s*${ROOM_WORD}`);
 const MAX_ROOMS_RE = new RegExp(`(?:at most|up to|max(?:imum)?|maksymalnie)\\s*(\\d+)\\s*-?\\s*${ROOM_WORD}`);
 const EXACT_ROOMS_RE = new RegExp(`(\\d+)\\s*-?\\s*${ROOM_WORD}`);
 
+// Matches English "floor(s)" and any Polish inflection of "piętro" (piętrze, piętrach,
+// piętrowe, ...) — normalization turns ę -> e, so they all share the "pietr" root.
+const FLOOR_WORD = "(?:floors?|pietr\\w*)";
+const GROUND_FLOOR_RE = /\b(?:ground floor|parter\w*)\b/;
+// Qualifier patterns (at least, at most, etc.) - also matches "floor N or higher" natural phrasing
+const MIN_FLOOR_RE = new RegExp(`(?:(?:at least|min(?:imum)?|co najmniej)\\s+(?:${FLOOR_WORD}\\s+)?|${FLOOR_WORD}\\s+(?=\\S.*or\\s+higher))(\\d+)`);
+const FLOOR_PLUS_RE = new RegExp(`(\\d+)\\s*\\+\\s*${FLOOR_WORD}`);
+const MAX_FLOOR_RE = new RegExp(`(?:at most|up to|max(?:imum)?|maksymalnie)\\s+(?:${FLOOR_WORD}\\s+)?(\\d+)`);
+// Exact floor patterns: word-before-number or number-before-word, floor word required
+const FLOOR_BEFORE_NUMBER_RE = new RegExp(`${FLOOR_WORD}\\s+(\\d+)`);
+const NUMBER_BEFORE_FLOOR_RE = new RegExp(`(\\d+)\\s*(?:st|nd|rd|th)?\\s*${FLOOR_WORD}`);
+
 // Extracts an explicit room count from already-normalized text, e.g.
 // "3 rooms"/"3-pokojowe" (exact), "3+ rooms"/"at least 2 pokoje" (min
 // only), "up to 4 rooms" (max only). Checked in this order so a qualified
@@ -164,10 +178,40 @@ function extractRoomRange(text: string): { minRooms: number | null; maxRooms: nu
   return { minRooms: null, maxRooms: null };
 }
 
+// Extracts an explicit floor from already-normalized text, e.g.
+// "ground floor"/"parter" (exact 0), "3rd floor"/"3 floor"/"floor 3"/"piętro 3" (exact),
+// "at least floor 2" (min only), "up to floor 4" (max only). Ground floor is checked
+// first since it has no digit to capture.
+function extractFloorRange(text: string): { minFloor: number | null; maxFloor: number | null } {
+  // Ground floor special case — "ground floor" or any "parter*" inflection -> floor 0
+  if (GROUND_FLOOR_RE.test(text)) return { minFloor: 0, maxFloor: 0 };
+
+  const min = MIN_FLOOR_RE.exec(text) ?? FLOOR_PLUS_RE.exec(text);
+  if (min) return { minFloor: Number(min[1]), maxFloor: null };
+
+  const max = MAX_FLOOR_RE.exec(text);
+  if (max) return { minFloor: null, maxFloor: Number(max[1]) };
+
+  // Try both "floor 3" and "3 floor" patterns for exact floor
+  const exactWordFirst = FLOOR_BEFORE_NUMBER_RE.exec(text);
+  if (exactWordFirst) {
+    const n = Number(exactWordFirst[1]);
+    return { minFloor: n, maxFloor: n };
+  }
+
+  const exactNumberFirst = NUMBER_BEFORE_FLOOR_RE.exec(text);
+  if (exactNumberFirst) {
+    const n = Number(exactNumberFirst[1]);
+    return { minFloor: n, maxFloor: n };
+  }
+
+  return { minFloor: null, maxFloor: null };
+}
+
 // Translates an already-detected filter set into the Prisma where-clause
 // that applies it so AI parser has it into account when generating the structured output. This is a separate function
 export function detectedFiltersToWhere(detected: DetectedFilters, stats: MarketStats): Prisma.ListingWhereInput {
-  const { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand, minRooms, maxRooms } =
+  const { city, district, amenities, hasElevator, sellerType, marketType, priceBand, areaBand, minRooms, maxRooms, minFloor, maxFloor } =
     detected;
 
   const and: Prisma.ListingWhereInput[] = [];
@@ -186,6 +230,12 @@ export function detectedFiltersToWhere(detected: DetectedFilters, stats: MarketS
     if (minRooms !== null) range.gte = minRooms;
     if (maxRooms !== null) range.lte = maxRooms;
     and.push({ rooms: range });
+  }
+  if (minFloor !== null || maxFloor !== null) {
+    const range: { gte?: number; lte?: number } = {};
+    if (minFloor !== null) range.gte = minFloor;
+    if (maxFloor !== null) range.lte = maxFloor;
+    and.push({ floor: range });
   }
 
   return and.length > 0 ? { AND: and } : {};
@@ -211,6 +261,7 @@ export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: M
   const priceBand = earliestMatch(lower, PRICE_BAND_CANDIDATES);
   const areaBand = earliestMatch(lower, AREA_BAND_CANDIDATES);
   const { minRooms, maxRooms } = extractRoomRange(lower);
+  const { minFloor, maxFloor } = extractFloorRange(lower);
 
   const detected: DetectedFilters = {
     city,
@@ -223,6 +274,8 @@ export function parseSearchQuery(text: string, vocab: SearchVocabulary, stats: M
     areaBand,
     minRooms,
     maxRooms,
+    minFloor,
+    maxFloor,
   };
   return { where: detectedFiltersToWhere(detected, stats), detected };
 }

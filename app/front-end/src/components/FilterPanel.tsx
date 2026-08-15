@@ -16,6 +16,8 @@ interface FilterFormState {
   maxArea: string;
   minRooms: string;
   maxRooms: string;
+  minFloor: string;
+  maxFloor: string;
   marketType: "" | MarketType;
   sellerType: "" | SellerType;
   hasElevator: "" | "true" | "false";
@@ -33,6 +35,8 @@ const DEFAULT_FORM_STATE: FilterFormState = {
   maxArea: "",
   minRooms: "",
   maxRooms: "",
+  minFloor: "",
+  maxFloor: "",
   marketType: "",
   sellerType: "",
   hasElevator: "",
@@ -53,6 +57,8 @@ function toListingFilters(form: FilterFormState): ListingFilters {
   if (form.maxArea) filters.maxArea = Number(form.maxArea);
   if (form.minRooms) filters.minRooms = Number(form.minRooms);
   if (form.maxRooms) filters.maxRooms = Number(form.maxRooms);
+  if (form.minFloor) filters.minFloor = Number(form.minFloor);
+  if (form.maxFloor) filters.maxFloor = Number(form.maxFloor);
   if (form.marketType) filters.marketType = form.marketType;
   if (form.sellerType) filters.sellerType = form.sellerType;
   if (form.hasElevator) filters.hasElevator = form.hasElevator === "true";
@@ -188,6 +194,26 @@ export default function FilterPanel({ onApply }: FilterPanelProps) {
                 value={form.maxRooms}
                 onChange={(e) => update("maxRooms", e.target.value)}
                 placeholder="Any"
+              />
+            </label>
+            <label>
+              Min floor
+              <input
+                type="number"
+                value={form.minFloor}
+                onChange={(e) => update("minFloor", e.target.value)}
+                placeholder="Any"
+                min="0"
+              />
+            </label>
+            <label>
+              Max floor
+              <input
+                type="number"
+                value={form.maxFloor}
+                onChange={(e) => update("maxFloor", e.target.value)}
+                placeholder="Any"
+                min="0"
               />
             </label>
             <label>

@@ -135,16 +135,17 @@ The resulting filters are then used to search the available offers.
 
 The AI mode uses the **Google Gemini API** to interpret natural-language queries and convert them into structured search filters.
 
-This allows users to perform searches using less precise descriptions and makes the search more tolerant of variations in wording and potential typos.
+This allows users to perform searches using less precise descriptions and makes the search more tolerant of variations in wording and potential typos and different languages.
 
 For example, a query such as:
 
-> `Premium flat with a lot of space and more than 3 rooms`
+> `Premium flat with a lot of space and at least a couple of rooms`
 
 can be interpreted into filters such as:
 
 - **Minimum price:** 941,750 PLN, based on price percentiles in the dataset
-- **Minimum rooms:** 4
+- **Minimum rooms:** 2
+- **Has elevator:** True
 - **Minimum area:** 63 m²
 
 The generated filters are then applied to the listings search.

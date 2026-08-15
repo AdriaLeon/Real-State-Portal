@@ -69,6 +69,10 @@ export function buildListingWhere(query: Query): Prisma.ListingWhereInput {
   const maxRooms = parseIntParam(query.maxRooms, "maxRooms");
   addRange(where as Record<string, { gte?: number; lte?: number }>, "rooms", minRooms, maxRooms);
 
+  const minFloor = parseIntParam(query.minFloor, "minFloor");
+  const maxFloor = parseIntParam(query.maxFloor, "maxFloor");
+  addRange(where as Record<string, { gte?: number; lte?: number }>, "floor", minFloor, maxFloor);
+
   return where;
 }
 

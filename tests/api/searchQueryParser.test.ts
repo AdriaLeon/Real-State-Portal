@@ -28,6 +28,8 @@ describe("parseSearchQuery", () => {
       areaBand: null,
       minRooms: null,
       maxRooms: null,
+      minFloor: null,
+      maxFloor: null,
     });
   });
 
@@ -202,6 +204,100 @@ describe("parseSearchQuery", () => {
       expect(parseSearchQuery("3+ rooms", vocab, stats).where).toEqual({
         AND: [{ rooms: { gte: 3 } }],
       });
+    });
+  });
+
+  describe("floor", () => {
+    it("detects ground floor in English and Polish", () => {
+      expect(parseSearchQuery("ground floor flat", vocab, stats).detected).toMatchObject({
+        minFloor: 0,
+        maxFloor: 0,
+      });
+      expect(parseSearchQuery("mieszkanie na parterze", vocab, stats).detected).toMatchObject({
+        minFloor: 0,
+        maxFloor: 0,
+      });
+      expect(parseSearchQuery("parter", vocab, stats).detected).toMatchObject({
+        minFloor: 0,
+        maxFloor: 0,
+      });
+    });
+
+    it("detects an exact floor count with and without ordinal suffixes", () => {
+      expect(parseSearchQuery("3rd floor flat", vocab, stats).detected).toMatchObject({
+        minFloor: 3,
+        maxFloor: 3,
+      });
+      expect(parseSearchQuery("2nd floor", vocab, stats).detected).toMatchObject({
+        minFloor: 2,
+        maxFloor: 2,
+      });
+      expect(parseSearchQuery("floor 3", vocab, stats).detected).toMatchObject({
+        minFloor: 3,
+        maxFloor: 3,
+      });
+      expect(parseSearchQuery("3 floor", vocab, stats).detected).toMatchObject({
+        minFloor: 3,
+        maxFloor: 3,
+      });
+    });
+
+    it("detects Polish floor phrasing with various inflections", () => {
+      // piętro, piętrze, piętrach all normalize to "pietro" before regex matching
+      expect(parseSearchQuery("mieszkanie na piętrze 4", vocab, stats).detected).toMatchObject({
+        minFloor: 4,
+        maxFloor: 4,
+      });
+      expect(parseSearchQuery("piętro 2", vocab, stats).detected).toMatchObject({
+        minFloor: 2,
+        maxFloor: 2,
+      });
+    });
+
+    it("detects an at-least floor count", () => {
+      expect(parseSearchQuery("at least floor 2", vocab, stats).detected).toMatchObject({
+        minFloor: 2,
+        maxFloor: null,
+      });
+      expect(parseSearchQuery("floor 3 or higher", vocab, stats).detected).toMatchObject({
+        minFloor: 3,
+        maxFloor: null,
+      });
+      expect(parseSearchQuery("co najmniej piętro 5", vocab, stats).detected).toMatchObject({
+        minFloor: 5,
+        maxFloor: null,
+      });
+    });
+
+    it("detects an at-most floor count", () => {
+      expect(parseSearchQuery("up to floor 5", vocab, stats).detected).toMatchObject({
+        minFloor: null,
+        maxFloor: 5,
+      });
+      expect(parseSearchQuery("maksymalnie piętro 4", vocab, stats).detected).toMatchObject({
+        minFloor: null,
+        maxFloor: 4,
+      });
+    });
+
+    it("maps a detected floor count to a Prisma range clause", () => {
+      expect(parseSearchQuery("3rd floor", vocab, stats).where).toEqual({
+        AND: [{ floor: { gte: 3, lte: 3 } }],
+      });
+      expect(parseSearchQuery("at least floor 2", vocab, stats).where).toEqual({
+        AND: [{ floor: { gte: 2 } }],
+      });
+      expect(parseSearchQuery("ground floor", vocab, stats).where).toEqual({
+        AND: [{ floor: { gte: 0, lte: 0 } }],
+      });
+    });
+
+    it("correctly handles rooms and floor in the same query without cross-contamination", () => {
+      const { detected } = parseSearchQuery("3 rooms, 2nd floor", vocab, stats);
+      expect(detected.minRooms).toBe(3);
+      expect(detected.maxRooms).toBe(3);
+      expect(detected.minFloor).toBe(2);
+      expect(detected.maxFloor).toBe(2);
     });
   });
 });

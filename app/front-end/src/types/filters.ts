@@ -13,6 +13,8 @@ export interface ListingFilters {
   maxArea?: number;
   minRooms?: number;
   maxRooms?: number;
+  minFloor?: number;
+  maxFloor?: number;
   marketType?: MarketType;
   sellerType?: SellerType;
   hasElevator?: boolean;
