@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
+  root: "app/front-end",
   plugins: [react()],
   resolve: {
     alias: {
@@ -21,5 +22,8 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },
+  },
+  build: {
+    outDir: "../../dist",
   },
 });
