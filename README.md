@@ -48,7 +48,7 @@ A full-stack smart real estate listings platform that crawls, normalizes, enrich
 git clone <repository-url>
 cd Real-State-Portal
 
-# Install all dependencies (backend + frontend) in one command
+# Install dependencies
 npm install
 ```
 
@@ -60,9 +60,8 @@ npm install
    ```
 
 2. **Edit `.env` and set required variables:**
-   - **`GEMINI_API_KEY`** ⭐ **REQUIRED** for AI features (AI summaries & AI search)
+   - **`GEMINI_API_KEY`** **REQUIRED** for AI features (AI summaries & AI search)
      - Get a free key at: https://aistudio.google.com/apikey
-     - All other variables have sensible defaults for local development
 
 ## Running the Application
 
@@ -97,6 +96,71 @@ npm run dev:api
 npm run dev:front
 ```
 
+---
+
+## Functionalities
+
+### 1. Trending Offers
+
+Displays the **3 cheapest available offers** in the current dataset, giving users a quick overview of low-price properties.
+
+### 2. Filtered Search
+
+Users can search for properties by combining multiple filters. After selecting the desired criteria, clicking **Apply** executes the search and displays the matching offers.
+
+Filters can be left blank. When no filters are specified, the application returns **all available offers**.
+
+### 3. Query Search
+
+The query search provides two modes: **Keyword** and **AI**.
+
+#### Keyword Mode
+
+The Keyword mode uses predefined word patterns and rules to identify information in the user's query and convert it into structured search filters.
+
+For example, the query:
+
+> `Big 3 room Krakow`
+
+can be interpreted as:
+
+- **Minimum rooms:** 3
+- **Maximum rooms:** 3
+- **Area:** Large properties, defined as being above the 75th percentile of property area in the dataset
+- **City:** Kraków
+
+The resulting filters are then used to search the available offers.
+
+#### AI Mode
+
+The AI mode uses the **Google Gemini API** to interpret natural-language queries and convert them into structured search filters.
+
+This allows users to perform searches using less precise descriptions and makes the search more tolerant of variations in wording and potential typos.
+
+For example, a query such as:
+
+> `Premium flat with a lot of space and more than 3 rooms`
+
+can be interpreted into filters such as:
+
+- **Minimum price:** 941,750 PLN, based on price percentiles in the dataset
+- **Minimum rooms:** 4
+- **Minimum area:** 63 m²
+
+The generated filters are then applied to the listings search.
+
+### 4. Offer Details Page
+
+Clicking on an offer opens a dedicated page containing detailed information about the property.
+
+The offer page includes:
+
+- A **carousel of property images**
+- The original **property description**
+- An **AI-generated description**, when available
+- A **details table** containing additional structured information about the property
+
+This page provides users with both the original listing information and the normalized data extracted during the processing pipeline.
 ---
 
 ## Data Pipeline Commands
